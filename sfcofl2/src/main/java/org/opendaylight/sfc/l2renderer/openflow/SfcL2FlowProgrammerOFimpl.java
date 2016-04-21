@@ -91,6 +91,7 @@ public class SfcL2FlowProgrammerOFimpl implements SfcL2FlowProgrammerInterface {
     private static final int PKTIN_IDLE_TIMEOUT = 60;
     private static final String EMPTY_SWITCH_PORT = "";
     public static final short APP_COEXISTENCE_NOT_SET = -1;
+    private static final short TUN_GPE_NP_NSH = 0x4;
 
     // Instance variables
     private short tableBase;
@@ -1093,12 +1094,17 @@ public class SfcL2FlowProgrammerOFimpl implements SfcL2FlowProgrammerInterface {
         String inPort = OutputPortValues.INPORT.toString();
 
         int order = 0;
-        List<Action> actionList = new ArrayList<>();
+        List<Action> actionList = new ArrayList<Action>();
+        actionList.add(SfcOpenflowUtils.createActionNxMoveNshMdtype(order++));
+        actionList.add(SfcOpenflowUtils.createActionNxMoveNshNp(order++));
         actionList.add(SfcOpenflowUtils.createActionNxMoveNsi(order++));
         actionList.add(SfcOpenflowUtils.createActionNxMoveNsp(order++));
         actionList.add(SfcOpenflowUtils.createActionNxMoveNsc1ToTunIpv4DstRegister(order++));
         actionList.add(SfcOpenflowUtils.createActionNxMoveNsc2ToTunIdRegister(order++));
         actionList.add(SfcOpenflowUtils.createActionOutPort(port, order++));
+
+        /* Need to set TUN_GPE_NP for VxLAN-gpe port */
+        actionList.add(SfcOpenflowUtils.createActionNxLoadTunGpeNp(TUN_GPE_NP_NSH, order++));
 
         FlowBuilder transportEgressFlow =
                 configureTransportEgressFlow(ofpMatch, actionList, inPort, order, FLOW_PRIORITY_TRANSPORT_EGRESS + 1);
@@ -1154,11 +1160,17 @@ public class SfcL2FlowProgrammerOFimpl implements SfcL2FlowProgrammerInterface {
 
         String port = OutputPortValues.INPORT.toString();
 
-        List<Action> actionList = new ArrayList<>();
+        List<Action> actionList = new ArrayList<Action>();
+        // Copy/Move Nsc1/Nsc2 to the next hop
+        actionList.add(SfcOpenflowUtils.createActionNxMoveNshMdtype(order++));
+        actionList.add(SfcOpenflowUtils.createActionNxMoveNshNp(order++));
         actionList.add(SfcOpenflowUtils.createActionNxMoveNsc1(order++));
         actionList.add(SfcOpenflowUtils.createActionNxMoveNsc2(order++));
         actionList.add(SfcOpenflowUtils.createActionNxMoveTunIdRegister(order++));
         actionList.add(SfcOpenflowUtils.createActionOutPort(port, order++));
+
+        /* Need to set TUN_GPE_NP for VxLAN-gpe port */
+        actionList.add(SfcOpenflowUtils.createActionNxLoadTunGpeNp(TUN_GPE_NP_NSH, order++));
 
         FlowBuilder transportEgressFlow =
                 configureTransportEgressFlow(ofpMatch, actionList, port, order, FLOW_PRIORITY_TRANSPORT_EGRESS + 1);
@@ -1189,6 +1201,7 @@ public class SfcL2FlowProgrammerOFimpl implements SfcL2FlowProgrammerInterface {
         SfcOpenflowUtils.addMatchNshNsi(match, nshNsi);
         SfcOpenflowUtils.addMatchNshNsc1(match, ipl);
 
+        /* Need to set TUN_GPE_NP for VxLAN-gpe port */
         int order = 0;
         List<Action> actionList = new ArrayList<>();
         actionList.add(SfcOpenflowUtils.createActionNxMoveNsi(order++));
@@ -1197,6 +1210,7 @@ public class SfcL2FlowProgrammerOFimpl implements SfcL2FlowProgrammerInterface {
         actionList.add(SfcOpenflowUtils.createActionNxMoveNsc2ToTunIdRegister(order++));
         actionList.add(SfcOpenflowUtils.createActionNxSetNshc1(0L, order++));
         actionList.add(SfcOpenflowUtils.createActionResubmitTable(getTableEgress(), order++));
+        actionList.add(SfcOpenflowUtils.createActionNxLoadTunGpeNp(TUN_GPE_NP_NSH, order++));
 
         Long vxlanOfPort = SfcOvsUtil.getVxlanOfPort(sffNodeName);
         MatchBuilder ofpMatch = new MatchBuilder(match.build()).setInPort(new NodeConnectorId(vxlanOfPort.toString()));
@@ -1239,8 +1253,17 @@ public class SfcL2FlowProgrammerOFimpl implements SfcL2FlowProgrammerInterface {
         actionList.add(SfcOpenflowUtils.createActionNxMoveNsc2(order++));
         actionList.add(SfcOpenflowUtils.createActionNxMoveTunIdRegister(order++));
         actionList.add(SfcOpenflowUtils.createActionOutPort(port, order++));
+        actionList.add(SfcOpenflowUtils.createActionNxMoveNshMdtype(order++));
+        actionList.add(SfcOpenflowUtils.createActionNxMoveNshNp(order++));
+        actionList.add(SfcOpenflowUtils.createActionNxMoveNsi(order++));
+        actionList.add(SfcOpenflowUtils.createActionNxMoveNsp(order++));
+        actionList.add(SfcOpenflowUtils.createActionNxMoveNsc1ToTunIpv4DstRegister(order++));
+        actionList.add(SfcOpenflowUtils.createActionNxMoveNsc2ToTunIdRegister(order++));
 
         MatchBuilder ofpMatch = new MatchBuilder(match.build());
+
+        /* Need to set TUN_GPE_NP for VxLAN-gpe port */
+        actionList.add(SfcOpenflowUtils.createActionNxLoadTunGpeNp(TUN_GPE_NP_NSH, order++));
 
         FlowBuilder transportEgressFlow =
                 configureTransportEgressFlow(ofpMatch, actionList, port, order, FLOW_PRIORITY_TRANSPORT_EGRESS);
